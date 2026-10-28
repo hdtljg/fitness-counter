@@ -1,4 +1,12 @@
 * text=auto
+
+# Dockerfile line continuations break if checked out with CRLF on Windows.
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+.gitignore text eol=lf
+LICENSE text eol=lf
+NOTICE text eol=lf
+
 *.py text eol=lf
 *.md text eol=lf
 *.txt text eol=lf
