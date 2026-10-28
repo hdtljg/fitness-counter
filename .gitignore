@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Generated outputs
+video-output/
+output/
+fitness_poses_images_out/
+*.log
+
+# Large local media / archives (keep the repo clone-friendly)
+1.mp4
+2.mp4
+3.mp4
+video-sample/
+训练集/
+mediapipe-*.whl
+
+# Environment files
+.env
