@@ -28,11 +28,11 @@
 ### 方式一：Docker（推荐，仅本地视频）
 
 ```bash
-git clone <你的仓库地址>
-cd <仓库目录>
+git clone https://github.com/hdtljg/fitness-counter.git
+cd fitness-counter
 
 docker build -t fitness-counter .
-mkdir -p output
+mkdir -p output        # PowerShell 用: mkdir output
 
 docker run --rm \
   -v "$(pwd)/samples:/data/input:ro" \
@@ -43,7 +43,31 @@ docker run --rm \
   --output /data/output/squat-out.mp4
 ```
 
-Windows PowerShell 中把 `$(pwd)` 换成 `${PWD}`；Git Bash 中如果路径转换有问题，使用 `$(pwd -W)`。
+macOS / Linux 使用上面的 `$(pwd)` 版本即可。Windows 用户按所用终端选择：
+
+PowerShell：
+
+```powershell
+docker run --rm `
+  -v "${PWD}/samples:/data/input:ro" `
+  -v "${PWD}/output:/data/output" `
+  fitness-counter `
+  --video /data/input/squat-sample-6s.mp4 `
+  --exercise squat `
+  --output /data/output/squat-out.mp4
+```
+
+Git Bash（`MSYS_NO_PATHCONV=1` 防止 `/data/...` 被改写成 Windows 路径）：
+
+```bash
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "$(pwd -W)/samples:/data/input:ro" \
+  -v "$(pwd -W)/output:/data/output" \
+  fitness-counter \
+  --video /data/input/squat-sample-6s.mp4 \
+  --exercise squat \
+  --output /data/output/squat-out.mp4
+```
 
 国内网络下首次构建如果很慢，可以换 Debian / PyPI 镜像（只影响构建，不写入镜像配置）：
 
