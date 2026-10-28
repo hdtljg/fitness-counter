@@ -1,0 +1,13 @@
+Fitness Counter
+Copyright 2026 Fitness Counter contributors
+
+This product includes software developed by Google as part of MediaPipe
+(https://github.com/google-ai-edge/mediapipe), licensed under the Apache
+License, Version 2.0.
+
+The pose-classification pipeline (pose embedding, k-NN pose classifier,
+EMA smoothing, repetition counter, and visualizer) is based on MediaPipe's
+pose classification example.
+
+Original fitness counter article:
+https://blog.csdn.net/m0_57110410/article/details/125569971

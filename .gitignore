@@ -12,9 +12,10 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Generated outputs
+# Generated outputs / local training data
 video-output/
 output/
+fitness_poses_images_in/
 fitness_poses_images_out/
 *.log
 

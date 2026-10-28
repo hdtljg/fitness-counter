@@ -1,108 +1,264 @@
-效果展示：
+# Fitness Counter（MediaPipe 健身动作计数）
 
-深蹲：
+基于 [MediaPipe BlazePose](https://github.com/google-ai-edge/mediapipe) 的俯卧撑、深蹲、引体向上计数工具。输入视频或摄像头画面，输出带骨架、分类置信度曲线和计数的视频。
 
-![](https://img-blog.csdnimg.cn/22c034a85a414b08b4e89c668d8b6d25.gif#pic_center)
+不需要训练神经网络：程序先从训练图片中提取 33 个 3D 人体关键点，转换成姿态特征向量，再用 k-NN 分类当前动作状态，最后通过双阈值计数。
 
-俯卧撑：
+![运行效果](markdown_needed/run.png)
 
-![](https://img-blog.csdnimg.cn/18703c54f9f8449f80165b6e60ab908c.gif#pic_center)
+## 功能
 
-本项目的测试环境：win10，python3.7，mediapipe0.8.10，pycharm
+- 支持 **俯卧撑**、**深蹲**、**引体向上** 三种动作
+- 支持本地视频文件、摄像头实时画面、交互式菜单
+- 仓库自带训练好的 CSV，克隆后无需准备数据即可运行
+- 也支持用自己的图片重建训练集
+- 提供 Dockerfile，一条命令跑通本地视频
+- 跨平台：Windows / Linux / macOS
 
-<font color='#fc5531'>功能：由于使用的是KNN算法而不是根据各个运动的特点计算骨骼之间的角度来判断动作是否完成，因此本项目可以直接计数引体向上、深蹲和俯卧撑这几种健身运动而几乎无需修改代码，只需要输入视频或调用摄像头时选择一下是哪个运动即可，非常滴好用。</font>
+## 环境要求
 
-各模块和文件介绍：
+- Python 3.10 或 3.11（Docker 镜像使用 3.10）
+- `mediapipe==0.10.21`
+- 不需要 GPU
 
-​		poseembedding.py是人体关键点归一化编码模块
+> **重要**：`mediapipe==0.9.1.0` 和 `0.8.10` 已从 PyPI 下架，旧版 `requirements.txt` 无法安装。本项目已锁定 `0.10.21`，并修复了 Pillow 10 / NumPy 2 的兼容问题。不要随意升级 `mediapipe`（1.x 不保证保留旧版 `solutions` API）。
 
-​		poseclassifier.py是人体姿态分类模块，使用的算法是k-NN
+## 快速开始
 
-​		resultsmooth.py是分类结果平滑模块，使用的是指数移动平均
+### 方式一：Docker（推荐，仅本地视频）
 
-​		counter.py是运动计数模块
+```bash
+git clone <你的仓库地址>
+cd <仓库目录>
 
-​		visualizer.py是分类结果可视化模块
+docker build -t fitness-counter .
+mkdir -p output
 
-​		extracttrainingsetkeypoint.py是提取和处理训练集关键点模块，并将特征向量存储在csv文件中
-
-​		trainingsetprocess.py是输入训练样本生成训练集以及训练集的检验校正的模块，里面说明了训练样本文件夹的要求
-
-​		videoprocess.py是检测视频并计数动作的的模块（注意class_name参数的含义）
-
-​		videocapture.py是调用摄像头实时检测并计数动作的模块（注意class_name参数的含义）
-
-​		main.py是整个项目运行的入口程序
-
-​		Roboto-Regular是visualizer.py中需要用到的字体文件
-
-​		video-sample中的squat-sample.mp4和pushup-sample.mp4是样本视频，当然你也可以换成你自己做深蹲或俯卧撑的测试视频，在videoprocess.py中把video_path换成您的视频路径即可，需要注意的是本项目使用cv2处理视频帧，<font color='#fc5531'>cv2要求路径不能有中文</font>，并且路径应使用“\\\”。
-
-​		视频输出在video-output文件夹里
-
-​		<font color='#fc5531'>fitness_poses_csvs_out文件夹里面的csv文件就是使用拍摄的训练样本提取出来的深蹲和俯卧撑的训练集文件，有了该文件后就可以直接运行本项目。当然，如果你想体验自己动手的快乐，可以自己拍摄训练样本并把它放到`fitness_poses_images_in`（存放样本图片的文件夹最好取这个名字省得去改代码）文件夹中，然后删掉`fitness_poses_csvs_out`文件夹中对应运动的两个csv文件，这两个csv文件丢失后程序会自动加载样本图片进行特征提取然后重新生成csv文件。尤其要注意的是训练样本的路径不能有中文，否则opencvc会报奇奇怪怪的错误。</font>
-
-<font color='#fc5531'>训练样本是该运动的两种状态的图片，理论上每个状态大约有几百个样本（例如，俯卧撑和深蹲的“向上”和“向下”位置），收集的样本涵盖不同的摄像机角度、环境条件、身体形状和运动变化，能做到这样最好。但实际中如果嫌麻烦的话每种状态15-25张左右都可以，然后要注意拍摄角度多样化，最好每隔15度拍摄一张。</font>
-
-```python
-训练样本图片文件夹结构
-|---fitness_poses_images_in
-	|---squat_down
-    	-001.jpg
-        -002.jpg
-        ...
-    |---squat_up
-    	-001.jpg
-        -002.jpg
-        ...
+docker run --rm \
+  -v "$(pwd)/samples:/data/input:ro" \
+  -v "$(pwd)/output:/data/output" \
+  fitness-counter \
+  --video /data/input/squat-sample-6s.mp4 \
+  --exercise squat \
+  --output /data/output/squat-out.mp4
 ```
 
-由于我们选择了简单易上手的k-最近邻算法(k-NN) 作为分类器（该算法根据训练集中最接近的样本确定对象的类别），而不是根据各运动的肢体之间的夹角特点作为分类依据，所以该方法具有良好的泛化通用能力，可以广泛应用在诸如深蹲（deep squat）、俯卧撑（push up）、引体向上（pull up）等健身运动的计数上，您只需要输入视频即可（或者如果您想使用自己采集的样本，只需要将训练样本图片更换成对应的运动即可）。
+Windows PowerShell 中把 `$(pwd)` 换成 `${PWD}`；Git Bash 中如果路径转换有问题，使用 `$(pwd -W)`。
 
-<font color='#fc5531'>`class_name`需要与你的训练样本的两个动作状态图像文件夹的名字中的一个（或者是与fitness_poses_csvs_out中的一个csv文件的名字）保持一致，它后面将用于分类时的索引。
-具体是哪个动作文件夹的名字取决于你的运动是什么，例如：如果是深蹲（俯卧撑），明显比较重要的判断计数动作是蹲下去（向下撑）；如果是引体向上，则判断计数的动作是向上拉到最高点的那个动作。</font>
+国内网络下首次构建如果很慢，可以换 Debian / PyPI 镜像（只影响构建，不写入镜像配置）：
 
-```python
-csv文件
-|---fitness_poses_csvs_out
-	|---push_down.csv
-    |---push_up.csv
-	|---squat_down.csv
-    |---squat_up.csv
+```bash
+docker build \
+  --build-arg APT_MIRROR_HOST=mirrors.tuna.tsinghua.edu.cn \
+  --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+  -t fitness-counter .
 ```
 
-以深蹲为例
+也可以直接用 Compose：
 
-
-
-![](./markdown_needed/file.jpg)
-
-所以代码中`class_name`为
-
-```python
-    if flag == 1:
-        class_name = 'push_down'
-        out_video_path = 'pushup-sample-out.mp4'
-    elif flag == 2:
-        class_name = 'squat_down'
-        out_video_path = 'squat-sample-out.mp4'
-    elif flag == 3:
-        class_name = 'pull_up'
-        out_video_path = 'squat-sample-out.mp4'
+```bash
+mkdir -p output
+docker compose run --rm --build fitness-counter
 ```
 
+输出视频在 `output/squat-out.mp4`。Docker 容器只支持**视频文件**模式；摄像头需要在本机 Python 环境运行（Windows/macOS 的 Docker Desktop 无法直接访问摄像头）。
 
+> Docker 里务必用 `--output` 指向挂载目录（如 `/data/output/...`），否则输出会留在容器内部，容器退出后就找不到了。
 
-![](./markdown_needed/class_name.jpg)
+### 方式二：本机 Python
 
+```bash
+python -m venv .venv
 
+# Windows
+.venv\Scripts\activate
+# Linux / macOS
+source .venv/bin/activate
 
-运行结果：
+pip install -r requirements.txt
 
+python code/main.py \
+  --video samples/squat-sample-6s.mp4 \
+  --exercise squat \
+  --output output/squat-out.mp4
+```
 
+有显示器的环境可以加 `--show` 实时预览。
 
-![](./markdown_needed/run.png)
+### 摄像头
 
+```bash
+python code/main.py --camera --exercise squat
+```
 
+按英文状态下的 `q` 或 `Esc` 退出。
 
-详细的说明可参考：https://blog.csdn.net/m0_57110410/article/details/125569971
+### 交互式菜单
+
+不带参数运行会进入原版菜单：
+
+```bash
+python code/main.py
+```
+
+```
+请输入检测模式（数字）：1. 从本地导入视频检测  2. 调用摄像头检测  3. 退出
+```
+
+## 支持的动作
+
+| `--exercise` | 菜单编号 | 计数的姿态类 | 使用的 CSV |
+|---|---|---|---|
+| `pushup` | 1 | `push_down` | `push_up.csv` / `push_down.csv` |
+| `squat` | 2 | `squat_down` | `squat_up.csv` / `squat_down.csv` |
+| `pullup` | 3 | `pull_up` | `pull_up.csv` / `pull_down.csv` |
+
+`--exercise` 还接受 `push-up`、`push_up`、`pull-up`、`pull_up` 等别名。
+
+## 命令行参数
+
+| 参数 | 说明 |
+|---|---|
+| `--video PATH` | 输入视频路径 |
+| `--camera` | 调用摄像头 |
+| `--exercise, -e NAME` | 运动类型：`pushup` / `squat` / `pullup` |
+| `--output, -o PATH` | 输出视频路径；不填则写入 `video-output/` |
+| `--show` | 处理视频时显示预览窗口，Docker/无显示器环境不要加 |
+| `--camera-index N` | 摄像头编号，默认 `0` |
+
+## 输出
+
+- 默认输出目录：`code/video-output/`（相对于 `code/` 目录）
+- 输出视频包含：人体骨架、分类置信度曲线、实时计数
+- 输出视频不包含原视频的音频
+- 人脸/身体画面会出现在输出中，分享前请自行确认隐私
+
+## 用自己的数据重新训练
+
+训练集是每个动作两个状态的图片。程序会自动提取关键点并生成 CSV。
+
+### 目录结构
+
+```
+code/fitness_poses_images_in/
+├── push_up/          # 或 squat_up / pull_up
+│   ├── image_001.jpg
+│   ├── image_002.jpg
+│   └── ...
+└── push_down/        # 或 squat_down / pull_down
+    ├── image_001.jpg
+    ├── image_002.jpg
+    └── ...
+```
+
+- 文件夹名必须是 `<csv_prefix>_up` 和 `<csv_prefix>_down`：
+  - 俯卧撑：`push_up` / `push_down`
+  - 深蹲：`squat_up` / `squat_down`
+  - 引体向上：`pull_up` / `pull_down`
+- 只处理当前选择动作的两个文件夹，其他动作的文件夹会被忽略。
+- 图片路径建议使用 ASCII 字符（OpenCV 在 Windows 上对中文路径支持不稳定）。
+- 每个状态建议 15–25 张以上，最好覆盖不同拍摄角度；样本越多、角度越丰富，计数越稳定。
+
+### 重建步骤
+
+1. 按上面的结构放好图片。
+2. 删除 `code/fitness_poses_csvs_out/` 中对应动作的两个 CSV，例如深蹲的 `squat_up.csv` 和 `squat_down.csv`。
+3. 运行程序。缺少 CSV 时会自动：
+   - 提取关键点，写入 `fitness_poses_csvs_out/`
+   - 生成带骨架标注的图片到 `fitness_poses_images_out/`
+   - 自动检测并删除离群样本
+4. 重新运行一次计数程序。
+
+> 当前 `pull_up.csv` / `pull_down.csv` 各只有 25 条样本，引体向上的计数稳定性弱于深蹲和俯卧撑。想要更好的效果，建议补拍样本后重建。
+
+## 工作原理
+
+```
+视频帧
+  → MediaPipe Pose 提取 33 个 3D 关键点
+  → FullBodyPoseEmbedder 归一化（平移 + 缩放）并构造成对距离特征
+  → PoseClassifier 两阶段 k-NN 投票
+      · 先按最大距离取前 30 个样本
+      · 再按平均距离取前 10 个样本投票
+  → EMADictSmoothing 指数移动平均平滑
+  → RepetitionCounter 双阈值（enter/exit）计数
+  → Visualizer 把曲线和计数叠加到画面
+```
+
+## 项目结构
+
+```
+.
+├── code/
+│   ├── main.py                        # 命令行 / 交互式入口
+│   ├── exercises.py                   # 动作与 CSV 的映射
+│   ├── videoprocess.py                # 本地视频检测
+│   ├── videocapture.py                # 摄像头检测
+│   ├── poseembedding.py               # 关键点归一化与特征编码
+│   ├── poseclassifier.py              # k-NN 姿态分类
+│   ├── resultsmooth.py                # EMA 平滑
+│   ├── counter.py                     # 重复计数
+│   ├── visualizer.py                  # 分类曲线与计数可视化
+│   ├── extracttrainingsetkeypoints.py # 图片 → 关键点 CSV
+│   ├── trainingsetprocess.py          # 训练集生成 / 离群点处理
+│   ├── video_to_frames.py             # 视频抽帧工具
+│   ├── rename_images.py               # 图片批量重命名工具
+│   ├── Roboto-Regular.ttf             # 计数显示字体
+│   └── fitness_poses_csvs_out/        # 预置训练集 CSV
+├── samples/                           # 可直接运行的短样例视频
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── LICENSE
+└── NOTICE
+```
+
+## 工具脚本
+
+```bash
+# 每 15 帧抽一张图到 frames/
+python code/video_to_frames.py input.mp4 frames/ --interval 15
+
+# 把图片按 image_001.jpg、image_002.jpg ... 重命名
+python code/rename_images.py path/to/images --prefix image --start 1
+```
+
+## 常见问题
+
+**`pip install` 找不到 mediapipe 0.9.1.0 / 0.8.10**
+
+旧版本已被 PyPI 下架。使用本仓库锁定的 `mediapipe==0.10.21`，并保持 `numpy<2`。
+
+**Windows 上 OpenCV 读不到视频/图片**
+
+视频、图片和输出路径尽量使用纯英文/数字，不要包含中文或特殊字符。Docker Desktop 用户也建议把仓库放在纯英文路径下。
+
+**Docker 里能调用摄像头吗？**
+
+默认不行。Windows/macOS 的 Docker Desktop 不能直接访问摄像头。Linux 主机可以尝试 `--device=/dev/video0` 并转发 X11，但不建议作为主要用法。摄像头请在宿主机用 Python 运行。
+
+**输出视频没有声音**
+
+程序只处理画面，不会复制音轨。
+
+**Docker 镜像为什么这么大？**
+
+`mediapipe` 依赖 `jax` / `jaxlib`，镜像接近 1GB 属于正常现象。首次构建需要下载依赖，请耐心等待。
+
+**`--show` 报错或无窗口**
+
+`--show` 需要图形界面。Docker、SSH 或无显示器环境请去掉该参数，程序仍会正常写出视频文件。
+
+**训练时内存占用很高**
+
+关键点提取和离群点检测比较占内存，建议 16GB 及以上；样本很多时可以先用 `per_pose_class_limit` 做小规模调试。
+
+## 许可证与致谢
+
+本项目使用 [Apache License 2.0](LICENSE)。
+
+姿态分类流程参考自 Google MediaPipe 的 pose classification 示例，MediaPipe 同样使用 Apache-2.0。原始健身计数文章：
+
+- https://blog.csdn.net/m0_57110410/article/details/125569971
+
+详见 [NOTICE](NOTICE)。

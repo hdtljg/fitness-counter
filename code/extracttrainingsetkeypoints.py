@@ -6,16 +6,20 @@ import tqdm
 import numpy as np
 from PIL import Image
 from PIL import ImageDraw
+
+import matplotlib
+matplotlib.use('Agg')  # Training can run on headless machines.
 from matplotlib import pyplot as plt
 from mediapipe.python.solutions import drawing_utils as mp_drawing
 from mediapipe.python.solutions import pose as mp_pose
 
 
 def show_image(img, figsize=(10, 10)):
-    """Shows output PIL image."""
+    """Shows output PIL image (no-op when using the Agg backend)."""
     plt.figure(figsize=figsize)
     plt.imshow(img)
     plt.show()
+    plt.close()
 
 
 # 提取训练集关键点坐标
@@ -25,13 +29,24 @@ class BootstrapHelper(object):
     def __init__(self,
                  images_in_folder,      # 训练样本图像
                  images_out_folder,     # 标好关键点的训练样本图像
-                 csvs_out_folder):
+                 csvs_out_folder,
+                 pose_class_names=None):
         self._images_in_folder = images_in_folder
         self._images_out_folder = images_out_folder
         self._csvs_out_folder = csvs_out_folder     # 通过样本图像提取的特征值作为训练集写入csv文件
 
+        if not os.path.isdir(self._images_in_folder):
+            raise FileNotFoundError(
+                'Training images folder does not exist: {}'.format(
+                    self._images_in_folder))
+
         # 获取姿势类列表（squat_down和squat_up）并打印图像统计信息。
-        self._pose_class_names = sorted([n for n in os.listdir(self._images_in_folder) if not n.startswith('.')])
+        available = sorted(
+            [n for n in os.listdir(self._images_in_folder) if not n.startswith('.')])
+        if pose_class_names is not None:
+            wanted = set(pose_class_names)
+            available = [name for name in available if name in wanted]
+        self._pose_class_names = available
 
     def bootstrap(self, per_pose_class_limit=None):
         # 在给定文件夹中引导图像
@@ -68,7 +83,7 @@ class BootstrapHelper(object):
             if not os.path.exists(images_out_folder):
                 os.makedirs(images_out_folder)
 
-            with open(csv_out_path, 'w', newline='') as csv_out_file:
+            with open(csv_out_path, 'w', newline='', encoding='utf-8') as csv_out_file:
                 csv_out_writer = csv.writer(csv_out_file, delimiter=',', quoting=csv.QUOTE_MINIMAL)
                 # 获取图片列表.
                 image_names = sorted([n for n in os.listdir(images_in_folder) if not n.startswith('.')])
@@ -79,7 +94,11 @@ class BootstrapHelper(object):
                 # 引导提取每个图像.
                 for image_name in tqdm.tqdm(image_names):
                     # Load image.
-                    input_frame = cv2.imread(os.path.join(images_in_folder, image_name))
+                    image_path = os.path.join(images_in_folder, image_name)
+                    input_frame = cv2.imread(image_path)
+                    if input_frame is None:
+                        print('Skipping unreadable image: ', image_path)
+                        continue
                     input_frame = cv2.cvtColor(input_frame, cv2.COLOR_BGR2RGB)
 
                     # 把图片放入1姿势检测模型中并返回33个landmarks的x,y,z坐标.
@@ -108,7 +127,8 @@ class BootstrapHelper(object):
                             dtype=np.float32)
                         assert pose_landmarks.shape == (33, 3), 'Unexpected landmarks shape: {}'.format(
                             pose_landmarks.shape)
-                        csv_out_writer.writerow([image_name] + pose_landmarks.flatten().astype(np.str_).tolist())
+                        csv_out_writer.writerow(
+                            [image_name] + pose_landmarks.flatten().astype(str).tolist())
 
                     # 绘制 XZ 投影并与图像连接。
                     projection_xz = self._draw_xz_projection(
@@ -148,7 +168,7 @@ class BootstrapHelper(object):
 
             # Read CSV into memory.
             rows = []
-            with open(csv_out_path, newline='') as csv_out_file:
+            with open(csv_out_path, newline='', encoding='utf-8') as csv_out_file:
                 csv_out_reader = csv.reader(csv_out_file, delimiter=',')
                 for row in csv_out_reader:
                     rows.append(row)
@@ -157,7 +177,7 @@ class BootstrapHelper(object):
             image_names_in_csv = []
 
             # 重写没有相应图像的 CSV 中的行，将它删除.
-            with open(csv_out_path, 'w', newline='') as csv_out_file:
+            with open(csv_out_path, 'w', newline='', encoding='utf-8') as csv_out_file:
                 csv_out_writer = csv.writer(csv_out_file, delimiter=',', quoting=csv.QUOTE_MINIMAL)
                 for row in rows:
                     image_name = row[0]

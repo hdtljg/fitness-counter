@@ -52,6 +52,11 @@ class PoseClassifier(object):
                                                      n_landmarks,
                                                      n_dimensions,
                                                      pose_embedder)
+        if not self._pose_samples:
+            raise ValueError(
+                'No pose samples loaded from {!r} for class {!r}. '
+                'Check that fitness_poses_csvs_out contains the matching CSV files.'
+                .format(str(pose_samples_folder), class_name))
 
     def _load_pose_samples(self,
                            pose_samples_folder,
@@ -75,9 +80,14 @@ class PoseClassifier(object):
           sample_00002,x1,y1,z1,x2,y2,z2,....
           ...
         """
+        if not os.path.isdir(pose_samples_folder):
+            raise FileNotFoundError(
+                'Pose samples folder does not exist: {}'.format(pose_samples_folder))
+
         classname = class_n.split('_')[0]
         # 文件夹中的每个文件代表一个姿势类.
-        file_names = [name for name in os.listdir(pose_samples_folder) if classname in name and name.endswith(file_extension)]
+        file_names = [name for name in os.listdir(pose_samples_folder)
+                      if classname in name and name.endswith(file_extension)]
 
         pose_samples = []
         for file_name in file_names:
@@ -85,7 +95,8 @@ class PoseClassifier(object):
             class_name = file_name[:-(len(file_extension) + 1)]
 
             # Parse CSV.
-            with open(os.path.join(pose_samples_folder, file_name)) as csv_file:
+            with open(os.path.join(pose_samples_folder, file_name),
+                      encoding='utf-8') as csv_file:
                 csv_reader = csv.reader(csv_file, delimiter=file_separator)
                 for row in csv_reader:
                     assert len(row) == n_landmarks * n_dimensions + 1, 'Wrong number of values: {}'.format(len(row))

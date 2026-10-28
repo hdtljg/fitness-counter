@@ -1,14 +1,18 @@
-from PIL import Image
-# import requests
 import io
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use('Agg')  # The plot is rendered to an in-memory buffer; no GUI needed.
 from matplotlib import pyplot as plt
-from PIL import ImageDraw
-from PIL import ImageFont
+from PIL import Image, ImageDraw, ImageFont
+
+DEFAULT_FONT_PATH = str(Path(__file__).resolve().parent / 'Roboto-Regular.ttf')
 
 
 # 分类结果可视化
 class PoseClassificationVisualizer(object):
-    """Keeps track of claassifcations for every frame and renders them."""
+    """Keeps track of classifications for every frame and renders them."""
 
     def __init__(self,
                  class_name,
@@ -21,7 +25,7 @@ class PoseClassificationVisualizer(object):
                  plot_y_max=None,
                  counter_location_x=0.80,
                  counter_location_y=0.05,
-                 #                counter_font_path='https://github.com/googlefonts/roboto/blob/main/src/hinted/Roboto-Regular.ttf?raw=true',
+                 counter_font_path=DEFAULT_FONT_PATH,
                  counter_font_color='red',
                  counter_font_size=0.1):
         self._class_name = class_name
@@ -34,7 +38,7 @@ class PoseClassificationVisualizer(object):
         self._plot_y_max = plot_y_max
         self._counter_location_x = counter_location_x
         self._counter_location_y = counter_location_y
-        #     self._counter_font_path = counter_font_path
+        self._counter_font_path = counter_font_path
         self._counter_font_color = counter_font_color
         self._counter_font_size = counter_font_size
 
@@ -48,10 +52,11 @@ class PoseClassificationVisualizer(object):
                  pose_classification,
                  pose_classification_filtered,
                  repetitions_count):
-        """Renders pose classifcation and counter until given frame."""
+        """Renders pose classification and counter until given frame."""
         # Extend classification history.
         self._pose_classification_history.append(pose_classification)
-        self._pose_classification_filtered_history.append(pose_classification_filtered)
+        self._pose_classification_filtered_history.append(
+            pose_classification_filtered)
 
         # Output frame with classification plot and counter.
         output_img = Image.fromarray(frame)
@@ -63,7 +68,7 @@ class PoseClassificationVisualizer(object):
         img = self._plot_classification_history(output_width, output_height)
         img.thumbnail((int(output_width * self._plot_max_width),
                        int(output_height * self._plot_max_height)),
-                      Image.ANTIALIAS)
+                      Image.Resampling.LANCZOS)
         output_img.paste(img,
                          (int(output_width * self._plot_location_x),
                           int(output_height * self._plot_location_y)))
@@ -72,8 +77,12 @@ class PoseClassificationVisualizer(object):
         output_img_draw = ImageDraw.Draw(output_img)
         if self._counter_font is None:
             font_size = int(output_height * self._counter_font_size)
-            #       font_request = requests.get(self._counter_font_path, allow_redirects=True)
-            self._counter_font = ImageFont.truetype('Roboto-Regular.ttf', size=font_size)
+            try:
+                self._counter_font = ImageFont.truetype(
+                    self._counter_font_path, size=font_size)
+            except OSError:
+                # Keep the app usable even if the bundled font is missing.
+                self._counter_font = ImageFont.load_default()
         output_img_draw.text((output_width * self._counter_location_x,
                               output_height * self._counter_location_y),
                              str(repetitions_count),
@@ -101,7 +110,6 @@ class PoseClassificationVisualizer(object):
         plt.xlabel('Frame')
         plt.ylabel('Confidence')
         plt.title('Classification history for `{}`'.format(self._class_name))
-        # plt.legend(loc='upper right')
 
         if self._plot_y_max is not None:
             plt.ylim(top=self._plot_y_max)
@@ -116,6 +124,6 @@ class PoseClassificationVisualizer(object):
         fig.savefig(buf, dpi=dpi)
         buf.seek(0)
         img = Image.open(buf)
-        plt.close()
+        plt.close(fig)
 
         return img

@@ -1,0 +1,7 @@
+mediapipe==0.10.21
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+matplotlib==3.9.2
+Pillow==10.4.0
+tqdm==4.67.1
+protobuf==4.25.5

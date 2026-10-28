@@ -1,0 +1,14 @@
+services:
+  fitness-counter:
+    build: .
+    image: fitness-counter:latest
+    volumes:
+      - ./samples:/data/input:ro
+      - ./output:/data/output
+    command:
+      - --video
+      - /data/input/squat-sample-6s.mp4
+      - --exercise
+      - squat
+      - --output
+      - /data/output/squat-out.mp4
